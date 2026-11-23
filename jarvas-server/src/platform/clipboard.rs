@@ -4,16 +4,20 @@ use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, GetClipboardData, OpenClipboard, SetClipboardData,
 };
-use windows::Win32::System::Ole::CF_UNICODETEXT;
 use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GHND};
+use windows::Win32::System::Ole::CF_UNICODETEXT;
 
 pub fn get_clipboard() -> ToolResult {
     unsafe {
-        OpenClipboard(None)
-            .map_err(|error| format!("Could not open the clipboard: {error}. Another app may be using it."))?;
+        OpenClipboard(None).map_err(|error| {
+            format!("Could not open the clipboard: {error}. Another app may be using it.")
+        })?;
         let data = GetClipboardData(CF_UNICODETEXT.0 as u32);
         let _ = CloseClipboard();
-        let handle: HANDLE = data.map_err(|_| "Clipboard does not contain text. Copy some text first or call set_clipboard.".to_string())?;
+        let handle: HANDLE = data.map_err(|_| {
+            "Clipboard does not contain text. Copy some text first or call set_clipboard."
+                .to_string()
+        })?;
         let pointer = GlobalLock(HGLOBAL(handle.0));
         if pointer.is_null() {
             return Err("Could not read clipboard memory.".to_string());
@@ -58,5 +62,8 @@ pub fn set_clipboard(text: &str) -> ToolResult {
         let _ = CloseClipboard();
     }
     safety::log("set_clipboard", &format!("chars={}", text.chars().count()));
-    Ok(format!("Clipboard set to {} character(s).", text.chars().count()))
+    Ok(format!(
+        "Clipboard set to {} character(s).",
+        text.chars().count()
+    ))
 }

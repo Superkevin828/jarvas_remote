@@ -1,0 +1,14 @@
+{
+  "$schema": "opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "jarvas": {
+        "type": "local",
+        "command": ["C:/Users/YOU/Downloads/jarvas-server.exe"],
+        "environment": {
+          "JARVAS_ACTION_DELAY_MS": "150"
+        }
+      }
+    }
+  }
+}

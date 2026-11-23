@@ -4,7 +4,7 @@ use std::ffi::c_void;
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::Graphics::Gdi::{
     BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits,
-    ReleaseDC, SelectObject, BI_RGB, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, SRCCOPY,
+    ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, SRCCOPY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     GetSystemMetrics, GetWindowRect, IsIconic, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN,
@@ -38,10 +38,17 @@ pub fn capture(window_handle: Option<u64>, path: Option<&str>) -> Result<Screens
         Some(handle) => {
             let handle = HWND(handle as usize as *mut c_void);
             let mut rect = RECT::default();
-            unsafe { GetWindowRect(handle, &mut rect) }
-                .map_err(|error| format!("Window 0x{:X} has no valid bounds: {error}", handle.0 as u64))?;
+            unsafe { GetWindowRect(handle, &mut rect) }.map_err(|error| {
+                format!(
+                    "Window 0x{:X} has no valid bounds: {error}",
+                    handle.0 as u64
+                )
+            })?;
             if unsafe { IsIconic(handle) }.as_bool() {
-                return Err(format!("Window 0x{:X} is minimized; restore it before taking a screenshot.", handle.0 as u64));
+                return Err(format!(
+                    "Window 0x{:X} is minimized; restore it before taking a screenshot.",
+                    handle.0 as u64
+                ));
             }
             (
                 rect.left,
@@ -51,10 +58,20 @@ pub fn capture(window_handle: Option<u64>, path: Option<&str>) -> Result<Screens
                 Some(handle),
             )
         }
-        None => unsafe { (0, 0, GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN), None) },
+        None => unsafe {
+            (
+                0,
+                0,
+                GetSystemMetrics(SM_CXVIRTUALSCREEN),
+                GetSystemMetrics(SM_CYVIRTUALSCREEN),
+                None,
+            )
+        },
     };
     if width <= 0 || height <= 0 {
-        return Err("Screen capture area is empty. Call get_screen_size to verify the display.".to_string());
+        return Err(
+            "Screen capture area is empty. Call get_screen_size to verify the display.".to_string(),
+        );
     }
 
     let png = unsafe { grab(left, top, width, height) }?;
@@ -68,10 +85,16 @@ pub fn capture(window_handle: Option<u64>, path: Option<&str>) -> Result<Screens
     };
     let detail = format!(
         "width={width}, height={height}, target={}",
-        hwnd.map(|handle| format!("window 0x{:X}", handle.0 as u64)).unwrap_or_else(|| "full screen".to_string())
+        hwnd.map(|handle| format!("window 0x{:X}", handle.0 as u64))
+            .unwrap_or_else(|| "full screen".to_string())
     );
     safety::log("screenshot", &detail);
-    Ok(Screenshot { png, width: width as u32, height: height as u32, saved_to })
+    Ok(Screenshot {
+        png,
+        width: width as u32,
+        height: height as u32,
+        saved_to,
+    })
 }
 
 unsafe fn grab(left: i32, top: i32, width: i32, height: i32) -> Result<Vec<u8>, String> {
@@ -86,14 +109,24 @@ unsafe fn grab(left: i32, top: i32, width: i32, height: i32) -> Result<Vec<u8>, 
     }
     let bitmap = CreateCompatibleBitmap(screen_dc, width, height);
     if bitmap.is_invalid() {
-        DeleteDC(memory_dc);
+        let _ = DeleteDC(memory_dc);
         ReleaseDC(None, screen_dc);
         return Err("Could not create a compatible bitmap.".to_string());
     }
     let old_bitmap = SelectObject(memory_dc, bitmap.into());
 
-    BitBlt(memory_dc, 0, 0, width, height, Some(screen_dc), left, top, SRCCOPY)
-        .map_err(|error| format!("Could not capture the screen: {error}"))?;
+    BitBlt(
+        memory_dc,
+        0,
+        0,
+        width,
+        height,
+        Some(screen_dc),
+        left,
+        top,
+        SRCCOPY,
+    )
+    .map_err(|error| format!("Could not capture the screen: {error}"))?;
 
     let mut info = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
@@ -118,8 +151,8 @@ unsafe fn grab(left: i32, top: i32, width: i32, height: i32) -> Result<Vec<u8>, 
         DIB_RGB_COLORS,
     );
     let _ = SelectObject(memory_dc, old_bitmap);
-    DeleteObject(bitmap.into());
-    DeleteDC(memory_dc);
+    let _ = DeleteObject(bitmap.into());
+    let _ = DeleteDC(memory_dc);
     ReleaseDC(None, screen_dc);
     if rows == 0 {
         return Err("Could not read captured pixels from Windows.".to_string());
@@ -127,7 +160,12 @@ unsafe fn grab(left: i32, top: i32, width: i32, height: i32) -> Result<Vec<u8>, 
 
     let mut png = Vec::new();
     image::codecs::png::PngEncoder::new(&mut png)
-        .write_image(&pixels, width as u32, height as u32, image::ExtendedColorType::Rgba8)
+        .write_image(
+            &pixels,
+            width as u32,
+            height as u32,
+            image::ExtendedColorType::Rgba8,
+        )
         .map_err(|error| format!("Could not encode screenshot as PNG: {error}"))?;
     Ok(png)
 }

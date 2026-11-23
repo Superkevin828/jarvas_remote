@@ -6,7 +6,9 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use windows::core::BOOL;
-use windows::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    RegisterHotKey, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT,
+};
 use windows::Win32::UI::WindowsAndMessaging::{GetMessageW, MSG, WM_HOTKEY};
 
 const HOTKEY_ID: i32 = 0x4a415641_u32 as i32;
@@ -48,7 +50,14 @@ pub fn init_panic_hotkey() {
     let safety = state();
     log("system", "starting; panic hotkey is Ctrl+Shift+J");
     std::thread::spawn(move || {
-        if let Err(error) = unsafe { RegisterHotKey(None, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, HOTKEY_VK) } {
+        if let Err(error) = unsafe {
+            RegisterHotKey(
+                None,
+                HOTKEY_ID,
+                MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT,
+                HOTKEY_VK,
+            )
+        } {
             eprintln!("[JARVAS] could not register panic hotkey Ctrl+Shift+J: {error}");
             return;
         }
@@ -61,7 +70,8 @@ pub fn init_panic_hotkey() {
             if message.message == WM_HOTKEY {
                 safety.stopped.store(true, Ordering::SeqCst);
                 eprintln!("[JARVAS] PANIC HOTKEY PRESSED - all further actions are blocked");
-                let _ = safety.append_log("PANIC", "Ctrl+Shift+J pressed; all further actions blocked");
+                let _ =
+                    safety.append_log("PANIC", "Ctrl+Shift+J pressed; all further actions blocked");
             }
         }
     });
@@ -123,7 +133,11 @@ pub fn action_log(limit: usize) -> String {
     if lines.is_empty() {
         "No actions logged yet.".to_string()
     } else {
-        lines.iter().map(|line| line.as_str()).collect::<Vec<_>>().join("\n")
+        lines
+            .iter()
+            .map(|line| line.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 

@@ -1,11 +1,11 @@
 use crate::platform::ToolResult;
 use crate::safety;
-use windows::Win32::System::Variant::VARIANT;
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
+use windows::Win32::System::Variant::VARIANT;
 use windows::Win32::UI::Accessibility::{
-    IUIAutomation, IUIAutomationCondition, IUIAutomationElement, IUIAutomationInvokePattern,
-    CUIAutomation, TreeScope_Descendants, UIA_ButtonControlTypeId,
+    CUIAutomation, IUIAutomation, IUIAutomationCondition, IUIAutomationElement,
+    IUIAutomationInvokePattern, TreeScope_Descendants, UIA_ButtonControlTypeId,
     UIA_CheckBoxControlTypeId, UIA_ComboBoxControlTypeId, UIA_ControlTypePropertyId,
     UIA_CustomControlTypeId, UIA_DataItemControlTypeId, UIA_DocumentControlTypeId,
     UIA_EditControlTypeId, UIA_GroupControlTypeId, UIA_HyperlinkControlTypeId,
@@ -13,10 +13,12 @@ use windows::Win32::UI::Accessibility::{
     UIA_MenuControlTypeId, UIA_MenuItemControlTypeId, UIA_NamePropertyId, UIA_PaneControlTypeId,
     UIA_ProgressBarControlTypeId, UIA_RadioButtonControlTypeId, UIA_ScrollBarControlTypeId,
     UIA_SliderControlTypeId, UIA_SpinnerControlTypeId, UIA_TabItemControlTypeId,
-    UIA_TableControlTypeId, UIA_TextControlTypeId, UIA_TreeControlTypeId, UIA_TreeItemControlTypeId,
-    UIA_WindowControlTypeId, UIA_CONTROLTYPE_ID,
+    UIA_TableControlTypeId, UIA_TextControlTypeId, UIA_TreeControlTypeId,
+    UIA_TreeItemControlTypeId, UIA_WindowControlTypeId, UIA_CONTROLTYPE_ID,
 };
-use windows::Win32::UI::Input::KeyboardAndMouse::{mouse_event, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    mouse_event, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
+};
 use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
 
 pub fn find_element(
@@ -27,7 +29,10 @@ pub fn find_element(
 ) -> ToolResult {
     safety::delay()?;
     if name.is_none() && role.is_none() && window_handle.is_none() {
-        return Err("Provide at least one of name, role, or window_handle to search for UI elements.".to_string());
+        return Err(
+            "Provide at least one of name, role, or window_handle to search for UI elements."
+                .to_string(),
+        );
     }
     let limit = max_results.clamp(1, 100);
     let elements = find_raw(name, role, window_handle, limit)?;
@@ -49,8 +54,15 @@ pub fn find_element(
             )
         })
         .collect();
-    safety::log("find_element", &format!("name={name:?}, role={role:?}, matches={}", items.len()));
-    Ok(format!("{{\"count\":{}, \"elements\":[{}]}}", items.len(), items.join(", ")))
+    safety::log(
+        "find_element",
+        &format!("name={name:?}, role={role:?}, matches={}", items.len()),
+    );
+    Ok(format!(
+        "{{\"count\":{}, \"elements\":[{}]}}",
+        items.len(),
+        items.join(", ")
+    ))
 }
 
 pub fn click_element(name: Option<&str>, role: Option<&str>, index: usize) -> ToolResult {
@@ -69,7 +81,10 @@ pub fn click_element(name: Option<&str>, role: Option<&str>, index: usize) -> To
         .map(|info| format!("'{}' (role '{}')", info.name, info.role))
         .unwrap_or_else(|_| format!("at index {index}"));
     let method = unsafe { invoke_or_click(element)? };
-    safety::log("click_element", &format!("element={label}, index={index}, method={method}"));
+    safety::log(
+        "click_element",
+        &format!("element={label}, index={index}, method={method}"),
+    );
     Ok(format!("Clicked {label} using {method}."))
 }
 
@@ -102,37 +117,51 @@ fn find_raw(
                     format!("Window 0x{:X} not found by UI Automation: {error}. Call list_windows for valid handles.", handle.0 as u64)
                 })?
             }
-            None => automation.GetRootElement().map_err(|error| format!("Could not access the desktop UI tree: {error}"))?,
+            None => automation
+                .GetRootElement()
+                .map_err(|error| format!("Could not access the desktop UI tree: {error}"))?,
         };
 
         let mut conditions: Vec<IUIAutomationCondition> = Vec::new();
         if let Some(name) = name {
             let value = VARIANT::from(name);
-            conditions.push(automation.CreatePropertyCondition(UIA_NamePropertyId, &value)
-                .map_err(|error| format!("Could not build name condition: {error}"))?);
+            conditions.push(
+                automation
+                    .CreatePropertyCondition(UIA_NamePropertyId, &value)
+                    .map_err(|error| format!("Could not build name condition: {error}"))?,
+            );
         }
         if let Some(role) = role {
             let control_type = control_type(role)?;
             let value = VARIANT::from(control_type.0);
-            conditions.push(automation.CreatePropertyCondition(UIA_ControlTypePropertyId, &value)
-                .map_err(|error| format!("Could not build role condition: {error}"))?);
+            conditions.push(
+                automation
+                    .CreatePropertyCondition(UIA_ControlTypePropertyId, &value)
+                    .map_err(|error| format!("Could not build role condition: {error}"))?,
+            );
         }
         let condition = match conditions.len() {
-            0 => automation.CreateTrueCondition().map_err(|error| format!("Could not build search condition: {error}"))?,
+            0 => automation
+                .CreateTrueCondition()
+                .map_err(|error| format!("Could not build search condition: {error}"))?,
             1 => conditions.remove(0),
             _ => {
                 let mut combined = conditions.remove(0);
                 for next in conditions {
-                    combined = automation.CreateAndCondition(&combined, &next)
+                    combined = automation
+                        .CreateAndCondition(&combined, &next)
                         .map_err(|error| format!("Could not combine search conditions: {error}"))?;
                 }
                 combined
             }
         };
 
-        let collection = root.FindAll(TreeScope_Descendants, &condition)
+        let collection = root
+            .FindAll(TreeScope_Descendants, &condition)
             .map_err(|error| format!("UI Automation search failed: {error}"))?;
-        let length = collection.Length().map_err(|error| format!("Could not read search results: {error}"))?;
+        let length = collection
+            .Length()
+            .map_err(|error| format!("Could not read search results: {error}"))?;
         let mut result = Vec::new();
         for index in 0..length {
             if result.len() >= limit {
@@ -147,28 +176,49 @@ fn find_raw(
 }
 
 unsafe fn describe(element: &IUIAutomationElement) -> Result<ElementInfo, String> {
-    let rectangle: RECT = element.CurrentBoundingRectangle()
+    let rectangle: RECT = element
+        .CurrentBoundingRectangle()
         .map_err(|error| format!("Could not read element bounds: {error}"))?;
     Ok(ElementInfo {
-        name: element.CurrentName().map(|value| value.to_string()).unwrap_or_default(),
-        role: role_name(element.CurrentControlType().map(|value| value.0).unwrap_or(0)),
-        automation_id: element.CurrentAutomationId().map(|value| value.to_string()).unwrap_or_default(),
+        name: element
+            .CurrentName()
+            .map(|value| value.to_string())
+            .unwrap_or_default(),
+        role: role_name(
+            element
+                .CurrentControlType()
+                .map(|value| value.0)
+                .unwrap_or(0),
+        ),
+        automation_id: element
+            .CurrentAutomationId()
+            .map(|value| value.to_string())
+            .unwrap_or_default(),
         left: rectangle.left,
         top: rectangle.top,
         width: rectangle.right - rectangle.left,
         height: rectangle.bottom - rectangle.top,
-        enabled: element.CurrentIsEnabled().map(|value| value.as_bool()).unwrap_or(false),
-        offscreen: element.CurrentIsOffscreen().map(|value| value.as_bool()).unwrap_or(false),
+        enabled: element
+            .CurrentIsEnabled()
+            .map(|value| value.as_bool())
+            .unwrap_or(false),
+        offscreen: element
+            .CurrentIsOffscreen()
+            .map(|value| value.as_bool())
+            .unwrap_or(false),
     })
 }
 
 unsafe fn invoke_or_click(element: &IUIAutomationElement) -> Result<&'static str, String> {
-    if let Ok(pattern) = element.GetCurrentPatternAs::<IUIAutomationInvokePattern>(UIA_InvokePatternId) {
+    if let Ok(pattern) =
+        element.GetCurrentPatternAs::<IUIAutomationInvokePattern>(UIA_InvokePatternId)
+    {
         if pattern.Invoke().is_ok() {
             return Ok("UI Automation InvokePattern");
         }
     }
-    let rectangle: RECT = element.CurrentBoundingRectangle()
+    let rectangle: RECT = element
+        .CurrentBoundingRectangle()
         .map_err(|error| format!("Could not read element bounds: {error}"))?;
     let width = rectangle.right - rectangle.left;
     let height = rectangle.bottom - rectangle.top;
@@ -177,7 +227,8 @@ unsafe fn invoke_or_click(element: &IUIAutomationElement) -> Result<&'static str
     }
     let x = rectangle.left + width / 2;
     let y = rectangle.top + height / 2;
-    SetCursorPos(x, y).map_err(|error| format!("Could not move cursor over the element: {error}"))?;
+    SetCursorPos(x, y)
+        .map_err(|error| format!("Could not move cursor over the element: {error}"))?;
     mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
     mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
     Ok("cursor click at element center")

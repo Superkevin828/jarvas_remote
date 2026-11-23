@@ -1,0 +1,17 @@
+# Build artifacts and local tool files
+jarvas-server/target/
+*.pdb
+*.log
+
+# Local release copy; distribute through GitHub Releases instead
+/jarvas-server.exe
+
+# Local agent/tooling files; not part of the JARVAS app
+.agents/
+skills/
+skills-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

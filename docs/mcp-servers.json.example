@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "jarvas": {
+      "command": "C:/Users/YOU/Downloads/jarvas-server.exe",
+      "args": [],
+      "env": {
+        "JARVAS_ACTION_DELAY_MS": "150"
+      }
+    }
+  }
+}

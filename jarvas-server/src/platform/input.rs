@@ -1,22 +1,23 @@
 use crate::platform::ToolResult;
 use crate::safety;
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, KEYBD_EVENT_FLAGS, KEYBDINPUT, INPUT, INPUT_KEYBOARD,
-    INPUT_MOUSE, MapVirtualKeyW, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
-    MOUSEEVENTF_WHEEL, MOUSE_EVENT_FLAGS, MOUSEINPUT, MAPVK_VK_TO_VSC, SendInput, VIRTUAL_KEY,
-    VK_ADD, VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DECIMAL, VK_DELETE, VK_DIVIDE, VK_DOWN,
-    VK_END, VK_ESCAPE, VK_F1, VK_HOME, VK_INSERT, VK_LEFT, VK_LWIN, VK_MENU, VK_MULTIPLY,
-    VK_NEXT, VK_NUMLOCK, VK_OEM_1, VK_OEM_2, VK_OEM_3, VK_OEM_4, VK_OEM_5, VK_OEM_6, VK_OEM_7,
-    VK_OEM_COMMA, VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PAUSE, VK_PRIOR, VK_RETURN,
-    VK_RIGHT, VK_SCROLL, VK_SHIFT, VK_SNAPSHOT, VK_SPACE, VK_SUBTRACT, VK_TAB, VK_UP,
-};
 use windows::Win32::Foundation::POINT;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    MapVirtualKeyW, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT,
+    KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC, MOUSEEVENTF_LEFTDOWN,
+    MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN,
+    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY, VK_ADD,
+    VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DECIMAL, VK_DELETE, VK_DIVIDE, VK_DOWN, VK_END, VK_ESCAPE,
+    VK_F1, VK_HOME, VK_INSERT, VK_LEFT, VK_LWIN, VK_MENU, VK_MULTIPLY, VK_NEXT, VK_NUMLOCK,
+    VK_OEM_1, VK_OEM_2, VK_OEM_3, VK_OEM_4, VK_OEM_5, VK_OEM_6, VK_OEM_7, VK_OEM_COMMA,
+    VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PAUSE, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SCROLL,
+    VK_SHIFT, VK_SNAPSHOT, VK_SPACE, VK_SUBTRACT, VK_TAB, VK_UP,
+};
 use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, SetCursorPos};
 
 pub fn move_mouse(x: i32, y: i32) -> ToolResult {
     safety::delay()?;
-    unsafe { SetCursorPos(x, y) }.map_err(|error| format!("Could not move cursor to ({x}, {y}): {error}"))?;
+    unsafe { SetCursorPos(x, y) }
+        .map_err(|error| format!("Could not move cursor to ({x}, {y}): {error}"))?;
     safety::log("move_mouse", &format!("x={x}, y={y}"));
     Ok(format!("Cursor moved to ({x}, {y})."))
 }
@@ -35,7 +36,11 @@ pub fn click(button: &str, double: bool, x: Option<i32>, y: Option<i32>) -> Tool
         "left" | "primary" => (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, "left"),
         "right" | "secondary" => (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, "right"),
         "middle" => (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, "middle"),
-        _ => return Err(format!("Unknown button '{button}'. Use 'left', 'right', or 'middle'.")),
+        _ => {
+            return Err(format!(
+                "Unknown button '{button}'. Use 'left', 'right', or 'middle'."
+            ))
+        }
     };
     if let (Some(x), Some(y)) = (x, y) {
         unsafe { SetCursorPos(x, y) }.map_err(|error| format!("Could not move cursor: {error}"))?;
@@ -50,14 +55,20 @@ pub fn click(button: &str, double: bool, x: Option<i32>, y: Option<i32>) -> Tool
         send_mouse(down, 0, 0, 0)?;
         send_mouse(up, 0, 0, 0)?;
     }
-    let detail = format!("{label}{} click at ({}, {})", if double { " double" } else { "" }, point.x, point.y);
+    let detail = format!(
+        "{label}{} click at ({}, {})",
+        if double { " double" } else { "" },
+        point.x,
+        point.y
+    );
     safety::log("click", &detail);
     Ok(format!("Performed {detail}."))
 }
 
 pub fn drag(from_x: i32, from_y: i32, to_x: i32, to_y: i32) -> ToolResult {
     safety::delay()?;
-    unsafe { SetCursorPos(from_x, from_y) }.map_err(|error| format!("Could not start drag: {error}"))?;
+    unsafe { SetCursorPos(from_x, from_y) }
+        .map_err(|error| format!("Could not start drag: {error}"))?;
     send_mouse(MOUSEEVENTF_LEFTDOWN, 0, 0, 0)?;
     let steps = 24_i32;
     for step in 1..=steps {
@@ -105,7 +116,14 @@ pub fn type_text(text: &str) -> ToolResult {
         }
         send_inputs(&inputs, "typing text")?;
     }
-    safety::log("type_text", &format!("chars={}, utf16_units={}", text.chars().count(), units.len()));
+    safety::log(
+        "type_text",
+        &format!(
+            "chars={}, utf16_units={}",
+            text.chars().count(),
+            units.len()
+        ),
+    );
     Ok(format!("Typed {} character(s).", text.chars().count()))
 }
 
@@ -123,9 +141,16 @@ pub fn tap_alt() -> Result<(), String> {
 
 pub fn hotkey(combo: &str) -> ToolResult {
     safety::delay()?;
-    let parts: Vec<&str> = combo.split('+').map(str::trim).filter(|part| !part.is_empty()).collect();
+    let parts: Vec<&str> = combo
+        .split('+')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect();
     if parts.len() < 2 {
-        return Err("Hotkey needs at least one modifier and one key, e.g. 'Ctrl+C', 'Alt+Tab', 'Win+R'.".to_string());
+        return Err(
+            "Hotkey needs at least one modifier and one key, e.g. 'Ctrl+C', 'Alt+Tab', 'Win+R'."
+                .to_string(),
+        );
     }
     let mut modifiers: Vec<VIRTUAL_KEY> = Vec::new();
     let mut main_keys: Vec<VIRTUAL_KEY> = Vec::new();
@@ -138,10 +163,14 @@ pub fn hotkey(combo: &str) -> ToolResult {
         }
     }
     if modifiers.is_empty() {
-        return Err("No modifier found. Include Ctrl, Alt, Shift, or Win (e.g. 'Ctrl+S').".to_string());
+        return Err(
+            "No modifier found. Include Ctrl, Alt, Shift, or Win (e.g. 'Ctrl+S').".to_string(),
+        );
     }
     if main_keys.len() != 1 {
-        return Err("A hotkey must contain exactly one non-modifier key (e.g. 'Ctrl+Shift+S').".to_string());
+        return Err(
+            "A hotkey must contain exactly one non-modifier key (e.g. 'Ctrl+Shift+S').".to_string(),
+        );
     }
     for &modifier in &modifiers {
         key_down(modifier)?;
@@ -160,54 +189,75 @@ pub fn hotkey(combo: &str) -> ToolResult {
 }
 
 fn send_mouse(flags: MOUSE_EVENT_FLAGS, dx: i32, dy: i32, data: u32) -> Result<(), String> {
-    let mut input = INPUT::default();
-    input.r#type = INPUT_MOUSE;
-    input.Anonymous.mi = MOUSEINPUT {
-        dx,
-        dy,
-        mouseData: data,
-        dwFlags: flags,
-        time: 0,
-        dwExtraInfo: 0,
+    let input = INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 {
+            mi: MOUSEINPUT {
+                dx,
+                dy,
+                mouseData: data,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
     };
     send_inputs(std::slice::from_ref(&input), "mouse input")
 }
 
 fn keyboard_unicode_input(scan: u16, up: bool) -> INPUT {
-    let flags = if up { KEYEVENTF_UNICODE | KEYEVENTF_KEYUP } else { KEYEVENTF_UNICODE };
-    let mut input = INPUT::default();
-    input.r#type = INPUT_KEYBOARD;
-    input.Anonymous.ki = KEYBDINPUT {
-        wVk: VIRTUAL_KEY(0),
-        wScan: scan,
-        dwFlags: flags,
-        time: 0,
-        dwExtraInfo: 0,
+    let flags = if up {
+        KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
+    } else {
+        KEYEVENTF_UNICODE
     };
-    input
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: scan,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
 }
 
 fn key_input(virtual_key: VIRTUAL_KEY, up: bool) -> INPUT {
     let scan = unsafe { MapVirtualKeyW(virtual_key.0 as u32, MAPVK_VK_TO_VSC) } as u16;
-    let flags = if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) };
-    let mut input = INPUT::default();
-    input.r#type = INPUT_KEYBOARD;
-    input.Anonymous.ki = KEYBDINPUT {
-        wVk: virtual_key,
-        wScan: scan,
-        dwFlags: flags,
-        time: 0,
-        dwExtraInfo: 0,
+    let flags = if up {
+        KEYEVENTF_KEYUP
+    } else {
+        KEYBD_EVENT_FLAGS(0)
     };
-    input
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: virtual_key,
+                wScan: scan,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
 }
 
 fn key_down(virtual_key: VIRTUAL_KEY) -> Result<(), String> {
-    send_inputs(std::slice::from_ref(&key_input(virtual_key, false)), "key down")
+    send_inputs(
+        std::slice::from_ref(&key_input(virtual_key, false)),
+        "key down",
+    )
 }
 
 fn key_up(virtual_key: VIRTUAL_KEY) -> Result<(), String> {
-    send_inputs(std::slice::from_ref(&key_input(virtual_key, true)), "key up")
+    send_inputs(
+        std::slice::from_ref(&key_input(virtual_key, true)),
+        "key up",
+    )
 }
 
 fn tap(virtual_key: VIRTUAL_KEY) -> Result<(), String> {
@@ -281,7 +331,9 @@ fn virtual_key(name: &str) -> Result<VIRTUAL_KEY, String> {
                     return Err(format!("Unsupported key '{name}'. Use names like 'enter', 'esc', 'space', 'f1', 'a', or 'ctrl'."));
                 }
             } else if let Some(number) = normalized.strip_prefix('f') {
-                let function_number = number.parse::<u16>().map_err(|_| format!("Unknown key '{name}'."))?;
+                let function_number = number
+                    .parse::<u16>()
+                    .map_err(|_| format!("Unknown key '{name}'."))?;
                 if !(1..=12).contains(&function_number) {
                     return Err(format!("Function key must be F1-F12, got '{name}'."));
                 }

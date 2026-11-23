@@ -3,8 +3,8 @@ use crate::safety;
 use std::ffi::c_void;
 use std::path::Path;
 use std::process::Command;
-use windows::core::{w, PCWSTR};
 use windows::core::BOOL;
+use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, RECT, TRUE, WPARAM};
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
@@ -30,7 +30,12 @@ struct WindowInfo {
 
 pub fn list_windows() -> ToolResult {
     let mut found: Vec<WindowInfo> = Vec::new();
-    if let Err(error) = unsafe { EnumWindows(Some(enum_window), LPARAM(&mut found as *mut Vec<WindowInfo> as isize)) } {
+    if let Err(error) = unsafe {
+        EnumWindows(
+            Some(enum_window),
+            LPARAM(&mut found as *mut Vec<WindowInfo> as isize),
+        )
+    } {
         return Err(format!("Could not enumerate windows: {error}"));
     }
     let items: Vec<String> = found
@@ -105,7 +110,11 @@ pub fn focus_window(window_handle: Option<u64>, title_contains: Option<&str>) ->
     Ok(format!("Focused window: {description}"))
 }
 
-pub fn close_window(window_handle: Option<u64>, title_contains: Option<&str>, confirm: bool) -> ToolResult {
+pub fn close_window(
+    window_handle: Option<u64>,
+    title_contains: Option<&str>,
+    confirm: bool,
+) -> ToolResult {
     safety::delay()?;
     safety::require_confirm(confirm, "close_window")?;
     let handle = resolve(window_handle, title_contains)?;
@@ -119,7 +128,9 @@ pub fn close_window(window_handle: Option<u64>, title_contains: Option<&str>, co
 pub fn minimize(window_handle: Option<u64>, title_contains: Option<&str>) -> ToolResult {
     safety::delay()?;
     let handle = resolve(window_handle, title_contains)?;
-    unsafe { ShowWindow(handle, SW_MINIMIZE); }
+    unsafe {
+        let _ = ShowWindow(handle, SW_MINIMIZE);
+    }
     let description = describe(handle)?;
     safety::log("minimize", &description);
     Ok(format!("Minimized window: {description}"))
@@ -128,7 +139,9 @@ pub fn minimize(window_handle: Option<u64>, title_contains: Option<&str>) -> Too
 pub fn maximize(window_handle: Option<u64>, title_contains: Option<&str>) -> ToolResult {
     safety::delay()?;
     let handle = resolve(window_handle, title_contains)?;
-    unsafe { ShowWindow(handle, SW_MAXIMIZE); }
+    unsafe {
+        let _ = ShowWindow(handle, SW_MAXIMIZE);
+    }
     let description = describe(handle)?;
     safety::log("maximize", &description);
     Ok(format!("Maximized window: {description}"))
@@ -137,7 +150,9 @@ pub fn maximize(window_handle: Option<u64>, title_contains: Option<&str>) -> Too
 pub fn restore_window(window_handle: Option<u64>, title_contains: Option<&str>) -> ToolResult {
     safety::delay()?;
     let handle = resolve(window_handle, title_contains)?;
-    unsafe { ShowWindow(handle, SW_RESTORE); }
+    unsafe {
+        let _ = ShowWindow(handle, SW_RESTORE);
+    }
     let description = describe(handle)?;
     safety::log("restore_window", &description);
     Ok(format!("Restored window: {description}"))
@@ -158,7 +173,10 @@ pub fn move_window(
     let handle = resolve(window_handle, title_contains)?;
     unsafe { MoveWindow(handle, x, y, width, height, true) }
         .map_err(|error| format!("Could not move/resize window: {error}"))?;
-    let detail = format!("handle=0x{:X}, x={x}, y={y}, width={width}, height={height}", handle.0 as u64);
+    let detail = format!(
+        "handle=0x{:X}, x={x}, y={y}, width={width}, height={height}",
+        handle.0 as u64
+    );
     safety::log("move_window", &detail);
     Ok(format!("Moved/resized window ({detail})."))
 }
@@ -194,14 +212,20 @@ pub fn launch_app(name_or_path: &str, args: Option<&str>) -> ToolResult {
         }
     }
 
-    safety::log("launch_app", &format!("name_or_path={trimmed}, args={:?}", arguments));
+    safety::log(
+        "launch_app",
+        &format!("name_or_path={trimmed}, args={:?}", arguments),
+    );
     Ok(format!("Launched '{trimmed}'."))
 }
 
 pub fn close_app(process_name: &str, confirm: bool) -> ToolResult {
     safety::delay()?;
     safety::require_confirm(confirm, "close_app")?;
-    let target = process_name.trim().trim_end_matches(".exe").to_ascii_lowercase();
+    let target = process_name
+        .trim()
+        .trim_end_matches(".exe")
+        .to_ascii_lowercase();
     if target.is_empty() {
         return Err("process_name must not be empty.".to_string());
     }
@@ -219,13 +243,18 @@ pub fn close_app(process_name: &str, confirm: bool) -> ToolResult {
             }
         }
     }
-    safety::log("close_app", &format!("process={process_name}, stopped={stopped}"));
+    safety::log(
+        "close_app",
+        &format!("process={process_name}, stopped={stopped}"),
+    );
     if stopped == 0 {
         Err(format!(
             "No running process named '{process_name}' was found. Use list_windows to find the app, or check the process name (for example 'notepad.exe')."
         ))
     } else {
-        Ok(format!("Closed {stopped} process(es) named '{process_name}'."))
+        Ok(format!(
+            "Closed {stopped} process(es) named '{process_name}'."
+        ))
     }
 }
 
@@ -293,11 +322,20 @@ fn is_executable(path: &str) -> bool {
 fn expand_environment(value: &str) -> String {
     let mut result = value.to_string();
     for (key, replacement) in [
-        ("USERPROFILE", std::env::var("USERPROFILE").unwrap_or_default()),
-        ("LOCALAPPDATA", std::env::var("LOCALAPPDATA").unwrap_or_default()),
+        (
+            "USERPROFILE",
+            std::env::var("USERPROFILE").unwrap_or_default(),
+        ),
+        (
+            "LOCALAPPDATA",
+            std::env::var("LOCALAPPDATA").unwrap_or_default(),
+        ),
         ("APPDATA", std::env::var("APPDATA").unwrap_or_default()),
         ("TEMP", std::env::var("TEMP").unwrap_or_default()),
-        ("ProgramFiles", std::env::var("ProgramFiles").unwrap_or_default()),
+        (
+            "ProgramFiles",
+            std::env::var("ProgramFiles").unwrap_or_default(),
+        ),
     ] {
         result = result.replace(&format!("%{key}%"), &replacement);
     }
